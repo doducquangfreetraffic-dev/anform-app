@@ -46,7 +46,7 @@ File ops, npm, git, tests, decisions about defaults — just do them.
 
 ## PHASE STATUS
 - [x] Phase 0: Validation passed
-- [ ] Phase 1: Project setup
+- [x] Phase 1: Project setup
 - [ ] Phase 2: Database schema
 - [ ] Phase 3: Auth flow
 - [ ] Phase 4: Form wizard UI
