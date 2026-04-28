@@ -52,5 +52,5 @@ File ops, npm, git, tests, decisions about defaults — just do them.
 - [x] Phase 4: Form wizard UI (5 steps + API routes)
 - [x] Phase 5: AI HTML generation (Opus 4.7, anti-zoom prompts, version history)
 - [x] Phase 6: Auto-deploy engine (Sheets + Apps Script + GitHub + verify)
-- [ ] Phase 7: Submissions dashboard
-- [ ] Phase 8: Production deploy
+- [x] Phase 7: Submissions dashboard (table + realtime + CSV export)
+- [x] Phase 8: Production deploy (anform.anvui.edu.vn live, prj_B1G0V3WTgcZ10vQgJ7Tq0DUxlFpS)
