@@ -48,7 +48,7 @@ File ops, npm, git, tests, decisions about defaults — just do them.
 - [x] Phase 0: Validation passed
 - [x] Phase 1: Project setup
 - [x] Phase 2: Database schema (Supavisor pooler aws-1-ap-southeast-1)
-- [ ] Phase 3: Auth flow
+- [x] Phase 3: Auth flow (Google provider config — manual step in BUILD_NEEDS_ATTENTION.md)
 - [ ] Phase 4: Form wizard UI
 - [ ] Phase 5: AI HTML generation
 - [ ] Phase 6: Auto-deploy engine
