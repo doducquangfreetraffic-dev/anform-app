@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isWhitelisted } from '@/lib/whitelist';
+import { isWhitelisted, recordLogin } from '@/lib/whitelist';
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -18,10 +18,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=exchange_failed`);
   }
 
-  if (!isWhitelisted(data.user.email)) {
+  if (!(await isWhitelisted(data.user.email))) {
     await supabase.auth.signOut();
     return NextResponse.redirect(`${origin}/access-denied`);
   }
+
+  await recordLogin(data.user.email);
 
   return NextResponse.redirect(`${origin}${next}`);
 }

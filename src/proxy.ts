@@ -46,7 +46,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  if (!isWhitelisted(user.email)) {
+  if (!(await isWhitelisted(user.email))) {
     return NextResponse.redirect(new URL('/access-denied', request.url));
   }
 

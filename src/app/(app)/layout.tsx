@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { isWhitelisted } from '@/lib/whitelist';
-import { LayoutDashboard, FileText, Settings, LogOut } from 'lucide-react';
+import { getUserRole } from '@/lib/whitelist';
+import { LayoutDashboard, FileText, Settings, Users } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import SignOutButton from '@/components/shared/SignOutButton';
 
@@ -13,7 +13,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   } = await supabase.auth.getUser();
 
   if (!user) redirect('/login');
-  if (!isWhitelisted(user.email)) redirect('/access-denied');
+
+  const role = await getUserRole(user.email);
+  if (!role) redirect('/access-denied');
 
   const fullName =
     (user.user_metadata?.full_name as string | undefined) ||
@@ -37,6 +39,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <NavLink href="/forms" icon={<FileText className="w-4 h-4" />}>
             Forms
           </NavLink>
+          {role === 'admin' && (
+            <NavLink href="/settings/team" icon={<Users className="w-4 h-4" />}>
+              Thành viên
+            </NavLink>
+          )}
           <NavLink href="/settings" icon={<Settings className="w-4 h-4" />}>
             Cài đặt
           </NavLink>
