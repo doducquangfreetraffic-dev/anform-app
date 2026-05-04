@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getUserRole } from '@/lib/whitelist';
+import { logAdminAction } from '@/lib/audit';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, Inbox } from 'lucide-react';
+import { Eye, ExternalLink, Inbox } from 'lucide-react';
 import HtmlPreview from '@/components/form-preview/HtmlPreview';
 import GenerateButton from './GenerateButton';
 import DeployButton from './DeployButton';
@@ -11,6 +13,7 @@ import type { Database } from '@/types/database';
 import type { FormBrief } from '@/types/form-brief';
 
 type FormRow = Database['public']['Tables']['forms']['Row'];
+type OwnerJoin = { email: string; full_name: string | null; avatar_url: string | null } | null;
 
 export default async function FormDetailPage({
   params,
@@ -19,13 +22,45 @@ export default async function FormDetailPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  const { data, error } = await supabase.from('forms').select('*').eq('id', id).single();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data, error } = await supabase
+    .from('forms')
+    .select('*, owner:profiles!owner_id(email, full_name, avatar_url)')
+    .eq('id', id)
+    .single();
   if (error || !data) notFound();
-  const form = data as unknown as FormRow;
+  const form = data as unknown as FormRow & { owner: OwnerJoin };
   const brief = form.brief as unknown as FormBrief;
+
+  const role = await getUserRole(user?.email);
+  const isOwner = form.owner_id === user?.id;
+  const adminViewingOthers = role === 'admin' && !isOwner;
+
+  if (adminViewingOthers && user?.email) {
+    await logAdminAction({
+      adminEmail: user.email,
+      action: 'view_form',
+      formId: form.id,
+      formSlug: form.slug,
+      targetOwnerEmail: form.owner?.email ?? null,
+    });
+  }
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
+      {adminViewingOthers && (
+        <div className="bg-honey/10 border-l-4 border-honey px-4 py-3 rounded-md flex items-center gap-3 text-sm">
+          <Eye className="w-4 h-4 text-honey shrink-0" />
+          <div className="flex-1">
+            Bạn đang xem form của{' '}
+            <strong className="text-forest">
+              {form.owner?.full_name || form.owner?.email || '—'}
+            </strong>
+            . Mọi thao tác (edit, deploy, delete) sẽ được ghi vào audit log.
+          </div>
+        </div>
+      )}
       <header className="flex justify-between items-start gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-2">
