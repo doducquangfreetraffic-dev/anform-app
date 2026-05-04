@@ -5,9 +5,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import type { FormBrief, BrandingTheme } from '@/types/form-brief';
+import CoverUpload from '@/components/cover/CoverUpload';
+import type { FormBrief, BrandingTheme, CoverStyle } from '@/types/form-brief';
+
+const COVER_STYLES: { value: CoverStyle; label: string; hint: string }[] = [
+  { value: 'auto', label: 'Auto ⭐', hint: 'AI tự chọn theo ảnh' },
+  { value: 'minimal', label: 'Minimal', hint: 'Sạch, nhiều khoảng trắng' },
+  { value: 'bold', label: 'Bold', hint: 'Typography lớn, contrast mạnh' },
+  { value: 'editorial', label: 'Editorial', hint: 'Phong cách tạp chí' },
+  { value: 'playful', label: 'Playful', hint: 'Vui tươi, bo tròn' },
+];
 
 const PRESETS: Record<BrandingTheme['preset'], { primary: string; secondary: string; bg: string; label: string }> = {
   angiao: { primary: '#1F4D2C', secondary: '#A47E22', bg: '#F5EFE0', label: 'An Giáo (rừng + mật)' },
@@ -115,6 +124,63 @@ export default function Step4Branding({
           ))}
         </div>
       )}
+
+      <div className="border-t border-soft-line pt-6 space-y-3">
+        <div className="flex items-center gap-2">
+          <ImageIcon className="w-4 h-4 text-honey" />
+          <Label className="text-base font-medium text-forest">Ảnh bìa form (tùy chọn)</Label>
+        </div>
+        <p className="text-xs text-muted-brand -mt-1">
+          Upload ảnh để AI phân tích màu sắc + thiết kế form đồng bộ với phong cách của ảnh.
+          Bỏ trống để dùng theme đã chọn ở trên.
+        </p>
+
+        <CoverUpload
+          initialUrl={brief.branding.coverImageUrl ?? null}
+          onUploaded={(url) =>
+            update({
+              branding: {
+                ...brief.branding,
+                coverImageUrl: url,
+                coverStyle: brief.branding.coverStyle ?? 'auto',
+              },
+            })
+          }
+          onRemoved={() =>
+            update({ branding: { ...brief.branding, coverImageUrl: null } })
+          }
+        />
+
+        {brief.branding.coverImageUrl && (
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-forest">Phong cách thiết kế</Label>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              {COVER_STYLES.map((s) => {
+                const active = (brief.branding.coverStyle ?? 'auto') === s.value;
+                return (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() =>
+                      update({ branding: { ...brief.branding, coverStyle: s.value } })
+                    }
+                    className={`px-3 py-2 rounded-lg border text-left transition ${
+                      active
+                        ? 'border-forest bg-forest/5'
+                        : 'border-soft-line hover:border-honey/60'
+                    }`}
+                  >
+                    <div className={`text-sm font-medium ${active ? 'text-forest' : 'text-ink'}`}>
+                      {s.label}
+                    </div>
+                    <div className="text-[10px] text-muted-brand mt-0.5">{s.hint}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="border-t border-soft-line pt-6">
         <div className="flex justify-between items-center mb-3">

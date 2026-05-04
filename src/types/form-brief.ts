@@ -20,6 +20,8 @@ export interface DatabaseEntry {
   [key: string]: string | number | undefined;
 }
 
+export type CoverStyle = 'auto' | 'minimal' | 'bold' | 'editorial' | 'playful';
+
 export interface BrandingTheme {
   preset: 'angiao' | 'forest' | 'honey' | 'minimal' | 'custom';
   primary: string;       // hex
@@ -28,6 +30,9 @@ export interface BrandingTheme {
   fontFamily: string;    // e.g. "Be Vietnam Pro"
   bannerImage?: string;  // base64 data URL or http URL
   logo?: string;
+  // Phase 8.7: optional cover image — when set, AI extracts palette + designs around it
+  coverImageUrl?: string | null;
+  coverStyle?: CoverStyle;
 }
 
 export interface FormSettings {
