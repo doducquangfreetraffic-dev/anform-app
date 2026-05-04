@@ -47,6 +47,11 @@ export interface Database {
           sheet_tab_name: string | null;
           form_url: string | null;
           submission_count: number;
+          cover_image_url: string | null;
+          cover_palette: Json | null;
+          cover_analysis: Json | null;
+          cover_uploaded_at: string | null;
+          cover_style: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -68,6 +73,11 @@ export interface Database {
           sheet_tab_name?: string | null;
           form_url?: string | null;
           submission_count?: number;
+          cover_image_url?: string | null;
+          cover_palette?: Json | null;
+          cover_analysis?: Json | null;
+          cover_uploaded_at?: string | null;
+          cover_style?: string | null;
         };
         Update: Partial<Database['public']['Tables']['forms']['Insert']>;
       };
