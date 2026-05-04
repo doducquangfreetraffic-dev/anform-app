@@ -127,6 +127,40 @@ export interface Database {
         };
         Update: Partial<Database['public']['Tables']['deploy_logs']['Insert']>;
       };
+      admin_audit_log: {
+        Row: {
+          id: string;
+          admin_email: string;
+          action:
+            | 'view_form'
+            | 'edit_form'
+            | 'delete_form'
+            | 'view_submissions'
+            | 'export_csv'
+            | 'deploy_form';
+          target_form_id: string | null;
+          target_form_slug: string | null;
+          target_owner_email: string | null;
+          metadata: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          admin_email: string;
+          action:
+            | 'view_form'
+            | 'edit_form'
+            | 'delete_form'
+            | 'view_submissions'
+            | 'export_csv'
+            | 'deploy_form';
+          target_form_id?: string | null;
+          target_form_slug?: string | null;
+          target_owner_email?: string | null;
+          metadata?: Json | null;
+        };
+        Update: Partial<Database['public']['Tables']['admin_audit_log']['Insert']>;
+      };
     };
     Functions: {
       increment_submission_count: {
