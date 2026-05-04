@@ -7,10 +7,12 @@ const PUBLIC_PATHS = ['/login', '/access-denied', '/api/auth/callback'];
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow public paths and webhooks
+  // Allow public paths, webhooks, and the cross-origin form submit endpoint
+  // (deployed forms at form.anvui.edu.vn POST here without an auth session).
   if (
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
-    pathname.startsWith('/api/webhooks/')
+    pathname.startsWith('/api/webhooks/') ||
+    pathname.startsWith('/api/forms/submit/')
   ) {
     return NextResponse.next();
   }
