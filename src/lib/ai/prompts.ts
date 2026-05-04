@@ -1,7 +1,11 @@
 import type { FormBrief } from '@/types/form-brief';
 import type { CoverAnalysis, FormPalette } from '@/lib/cover-analysis';
 
+// Kept for backwards compatibility with previously generated HTML — the
+// orchestrator now substitutes both placeholders with the ANFORM submit
+// endpoint URL so old templates keep working.
 export const HTML_PLACEHOLDER_APPS_SCRIPT = '__APPS_SCRIPT_URL__';
+export const HTML_PLACEHOLDER_SUBMIT_URL = '__SUBMIT_URL__';
 export const HTML_PLACEHOLDER_FORM_SLUG = '__FORM_SLUG__';
 
 export const SYSTEM_PROMPT = `Bạn là senior frontend engineer + product designer chuyên tạo form đăng ký mobile-first cho cộng đồng học viên Việt Nam.
@@ -17,14 +21,14 @@ YÊU CẦU KỸ THUẬT:
    - JS chặn gesturestart, gesturechange, double-tap touchend
    - input/textarea/select font-size: 16px (chống iOS zoom-in khi focus)
 3. Tất cả input phải có placeholder và label rõ ràng.
-4. Submit POST tới placeholder ${HTML_PLACEHOLDER_APPS_SCRIPT} với Content-Type: text/plain (tránh CORS preflight với Apps Script).
+4. Submit POST tới placeholder ${HTML_PLACEHOLDER_SUBMIT_URL} với Content-Type: text/plain (tránh CORS preflight). Endpoint trả JSON {ok:true|false}.
 5. Body submit là JSON.stringify({ timestamp, name, email, phone, klass, sessions, sessionIds, formSlug: '${HTML_PLACEHOLDER_FORM_SLUG}', meta }).
 6. Hiển thị trang "Đã ghi nhận" sau khi submit (DOM swap, không reload).
 7. Validate trước khi submit: bắt buộc các field theo settings, ít nhất 1 buổi nếu sessions.length > 0.
 8. Embed danh sách database (nếu có) vào const DB = [...] trong <script> để autocomplete khi user gõ email/tên.
 9. Không inline base64 image quá lớn — nếu brief.branding.bannerImage có URL http(s), dùng <img src=...>.
 10. Code clean, có comment ngắn gọn các section. KHÔNG dùng React/Vue/framework — chỉ vanilla JS.
-11. KHÔNG mở Apps Script trong window.open — submit form bằng fetch.
+11. KHÔNG mở submit URL trong window.open — submit form bằng fetch.
 
 CẤU TRÚC:
 - <header> với title + subtitle + organizer

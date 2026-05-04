@@ -1,9 +1,24 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { addTabToMasterSheet } from './google-sheets';
-import { createAndDeployScript } from './apps-script';
 import { pushFormHtml, ensureVercelConfig } from './github';
-import { verifyFormLive } from './verify';
-import { HTML_PLACEHOLDER_APPS_SCRIPT, HTML_PLACEHOLDER_FORM_SLUG } from '@/lib/ai/prompts';
+import { verifyFormLive, verifySubmitEndpoint } from './verify';
+import {
+  HTML_PLACEHOLDER_APPS_SCRIPT,
+  HTML_PLACEHOLDER_SUBMIT_URL,
+  HTML_PLACEHOLDER_FORM_SLUG,
+} from '@/lib/ai/prompts';
+
+function getAnformBaseUrl(): string {
+  const explicit = process.env.ANFORM_PUBLIC_URL;
+  if (explicit) return explicit.replace(/\/$/, '');
+  const next = process.env.NEXT_PUBLIC_APP_URL;
+  if (next && !next.startsWith('http://localhost')) return next.replace(/\/$/, '');
+  return 'https://anform.anvui.edu.vn';
+}
+
+export function buildSubmitUrl(slug: string): string {
+  return `${getAnformBaseUrl()}/api/forms/submit/${slug}`;
+}
 
 interface DeployResult {
   ok: boolean;
@@ -33,8 +48,7 @@ export async function deployForm(opts: {
 }): Promise<DeployResult> {
   const errors: string[] = [];
   const admin = createAdminClient();
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-  const webhookUrl = `${baseUrl}/api/webhooks/submission`;
+  const submitUrl = buildSubmitUrl(opts.slug);
 
   // 1. Ensure vercel.json (idempotent)
   try {
@@ -46,49 +60,43 @@ export async function deployForm(opts: {
     await logStep(opts.formId, 'ensure_vercel_config', 'failed', msg);
   }
 
-  // 2. Add tab to Master Sheet
+  // 2. Add tab to Master Sheet (idempotent — reuse if existing form has tab)
   let tabName = '';
-  try {
-    const r = await addTabToMasterSheet(opts.slug);
-    tabName = r.tabName;
-    await logStep(opts.formId, 'add_sheet_tab', 'success', `tabName=${tabName}`);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    errors.push('sheet_tab: ' + msg);
-    await logStep(opts.formId, 'add_sheet_tab', 'failed', msg);
-    return { ok: false, errors };
+  const existingForm = await admin
+    .from('forms')
+    .select('sheet_tab_name')
+    .eq('id', opts.formId)
+    .single();
+  const existingTab = (existingForm.data as { sheet_tab_name?: string | null } | null)
+    ?.sheet_tab_name;
+  if (existingTab) {
+    tabName = existingTab;
+    await logStep(opts.formId, 'add_sheet_tab', 'success', `reused tabName=${tabName}`);
+  } else {
+    try {
+      const r = await addTabToMasterSheet(opts.slug);
+      tabName = r.tabName;
+      await logStep(opts.formId, 'add_sheet_tab', 'success', `tabName=${tabName}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push('sheet_tab: ' + msg);
+      await logStep(opts.formId, 'add_sheet_tab', 'failed', msg);
+      return { ok: false, errors };
+    }
   }
 
-  // 3. Create + deploy Apps Script
-  let appsScriptUrl = '';
-  let appsScriptId = '';
-  let appsScriptOk = false;
-  try {
-    const r = await createAndDeployScript({
-      formSlug: opts.slug,
-      sheetId: process.env.GOOGLE_MASTER_SHEET_ID!,
-      tabName,
-      webhookUrl,
-    });
-    appsScriptUrl = r.webAppUrl;
-    appsScriptId = r.scriptId;
-    appsScriptOk = true;
-    await logStep(opts.formId, 'apps_script_deploy', 'success', `scriptId=${appsScriptId}`);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    errors.push('apps_script: ' + msg);
-    await logStep(opts.formId, 'apps_script_deploy', 'failed', msg);
-    // continue — push HTML with placeholder so user can retry
-  }
+  // Persist tab name now so the submit endpoint can find it during verification.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (admin.from('forms') as any).update({ sheet_tab_name: tabName }).eq('id', opts.formId);
 
-  // 4. Replace placeholders in HTML
+  // 3. Replace placeholders in HTML — submit URL replaces the legacy Apps Script
+  // placeholder so previously-generated templates keep working.
   let finalHtml = opts.html;
-  if (appsScriptOk) {
-    finalHtml = finalHtml.split(HTML_PLACEHOLDER_APPS_SCRIPT).join(appsScriptUrl);
-  }
+  finalHtml = finalHtml.split(HTML_PLACEHOLDER_SUBMIT_URL).join(submitUrl);
+  finalHtml = finalHtml.split(HTML_PLACEHOLDER_APPS_SCRIPT).join(submitUrl);
   finalHtml = finalHtml.split(HTML_PLACEHOLDER_FORM_SLUG).join(opts.slug);
 
-  // 5. Push HTML to anform-form-deployments
+  // 4. Push HTML to anform-form-deployments
   try {
     await pushFormHtml({ slug: opts.slug, html: finalHtml });
     await logStep(opts.formId, 'push_html', 'success');
@@ -99,33 +107,38 @@ export async function deployForm(opts: {
     return { ok: false, errors };
   }
 
-  // 6. Verify
+  // 5. Verify form HTML is live
   const live = await verifyFormLive(opts.slug, 150000);
-  await logStep(opts.formId, 'verify', live ? 'success' : 'failed', live ? 'live' : 'timeout');
+  await logStep(opts.formId, 'verify_html', live ? 'success' : 'failed', live ? 'live' : 'timeout');
+
+  // 6. Verify submit endpoint actually accepts a POST (catches Apps Script /
+  // route mis-deploys before a real user hits the form).
+  const submitCheck = await verifySubmitEndpoint(submitUrl);
+  await logStep(
+    opts.formId,
+    'verify_submit',
+    submitCheck.ok ? 'success' : 'failed',
+    submitCheck.ok ? 'ok' : submitCheck.error,
+  );
 
   const formUrl = `${process.env.ANFORM_FORMS_BASE_URL ?? 'https://form.anvui.edu.vn'}/${opts.slug}/`;
+  const allOk = live && submitCheck.ok;
 
   // 7. Update form row
   const updates: Record<string, unknown> = {
-    apps_script_url: appsScriptOk ? appsScriptUrl : null,
-    apps_script_id: appsScriptOk ? appsScriptId : null,
+    apps_script_url: submitUrl, // Reused column — now stores the submit endpoint.
     sheet_tab_name: tabName,
     form_url: formUrl,
-    status: live && appsScriptOk ? 'deployed' : 'draft',
-    deployment_status: !appsScriptOk
-      ? 'apps_script_failed'
-      : live
-        ? 'deployed'
-        : 'verify_failed',
+    status: allOk ? 'deployed' : 'draft',
+    deployment_status: !live ? 'verify_failed' : !submitCheck.ok ? 'submit_failed' : 'deployed',
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (admin.from('forms') as any).update(updates).eq('id', opts.formId);
 
   return {
-    ok: live && appsScriptOk,
+    ok: allOk,
     formUrl,
-    appsScriptUrl: appsScriptOk ? appsScriptUrl : undefined,
-    appsScriptId: appsScriptOk ? appsScriptId : undefined,
+    appsScriptUrl: submitUrl,
     sheetTabName: tabName,
     errors: errors.length ? errors : undefined,
   };
