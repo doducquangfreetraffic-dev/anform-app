@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getUserRole } from '@/lib/whitelist';
-import { LayoutDashboard, FileText, Settings, Users } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, Users, ShieldAlert } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import SignOutButton from '@/components/shared/SignOutButton';
 
@@ -40,9 +40,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             Forms
           </NavLink>
           {role === 'admin' && (
-            <NavLink href="/settings/team" icon={<Users className="w-4 h-4" />}>
-              Thành viên
-            </NavLink>
+            <>
+              <NavLink href="/settings/team" icon={<Users className="w-4 h-4" />}>
+                Thành viên
+              </NavLink>
+              <NavLink href="/settings/audit" icon={<ShieldAlert className="w-4 h-4" />}>
+                Audit log
+              </NavLink>
+            </>
           )}
           <NavLink href="/settings" icon={<Settings className="w-4 h-4" />}>
             Cài đặt

@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getUserRole } from '@/lib/whitelist';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, ChevronRight } from 'lucide-react';
+import { Users, ChevronRight, ShieldAlert } from 'lucide-react';
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -38,7 +38,7 @@ export default async function SettingsPage() {
           <CardHeader>
             <CardTitle className="text-forest text-base">Quản trị</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 divide-y divide-soft-line">
             <Link
               href="/settings/team"
               className="flex items-center justify-between gap-3 px-6 py-4 hover:bg-paper transition"
@@ -48,6 +48,19 @@ export default async function SettingsPage() {
                 <div>
                   <div className="text-sm font-medium text-ink">Thành viên</div>
                   <div className="text-xs text-muted-brand">Thêm/xóa email được phép đăng nhập</div>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-brand" />
+            </Link>
+            <Link
+              href="/settings/audit"
+              className="flex items-center justify-between gap-3 px-6 py-4 hover:bg-paper transition"
+            >
+              <div className="flex items-center gap-3">
+                <ShieldAlert className="w-4 h-4 text-honey" />
+                <div>
+                  <div className="text-sm font-medium text-ink">Audit log</div>
+                  <div className="text-xs text-muted-brand">Hoạt động admin trên forms của người khác</div>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-muted-brand" />
