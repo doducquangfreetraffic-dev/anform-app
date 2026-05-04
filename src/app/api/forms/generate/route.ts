@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { generateHtml } from '@/lib/ai/anthropic';
 import { SYSTEM_PROMPT, buildUserPrompt, extractHtml } from '@/lib/ai/prompts';
+import { analyzeCover, paletteFromAnalysis } from '@/lib/cover-analysis';
 import type { FormBrief } from '@/types/form-brief';
 
 export const maxDuration = 300; // 5 min for Opus generation
@@ -36,11 +37,25 @@ export async function POST(req: NextRequest) {
   const form = formRaw as any;
   const brief = form.brief as FormBrief;
 
+  // Optional: analyze cover image if brief carries one
+  type Cover = Awaited<ReturnType<typeof buildCover>>;
+  let cover: Cover | null = null;
+  const coverImageUrl = brief.branding?.coverImageUrl;
+  if (coverImageUrl) {
+    try {
+      cover = await buildCover(coverImageUrl);
+    } catch (err) {
+      // Non-fatal: log and continue with default theme
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[generate] cover analysis failed, falling back to theme:', msg);
+    }
+  }
+
   let html: string;
   try {
     const raw = await generateHtml({
       system: SYSTEM_PROMPT,
-      user: buildUserPrompt(brief, form.slug),
+      user: buildUserPrompt(brief, form.slug, cover),
       maxTokens: 16000,
     });
     html = extractHtml(raw);
@@ -55,15 +70,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Generation failed: ${msg}` }, { status: 502 });
   }
 
-  // Save to forms table + record version
+  // Save HTML + cover artifacts
+  const updates: Record<string, unknown> = { current_html: html };
+  if (cover) {
+    updates.cover_image_url = cover.imageUrl;
+    updates.cover_palette = cover.palette as unknown;
+    updates.cover_analysis = cover.analysis as unknown;
+    updates.cover_uploaded_at = new Date().toISOString();
+    updates.cover_style = brief.branding?.coverStyle ?? 'auto';
+  } else if (coverImageUrl) {
+    // Cover URL was set but analysis failed — still record the URL so the row is consistent
+    updates.cover_image_url = coverImageUrl;
+    updates.cover_uploaded_at = new Date().toISOString();
+    updates.cover_style = brief.branding?.coverStyle ?? 'auto';
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: updErr } = await (supabase.from('forms') as any)
-    .update({ current_html: html })
+    .update(updates)
     .eq('id', form.id);
   if (updErr) {
     return NextResponse.json({ error: updErr.message }, { status: 500 });
   }
 
+  // Version snapshot
   const { data: latestRaw } = await supabase
     .from('form_versions')
     .select('version_number')
@@ -86,5 +115,12 @@ export async function POST(req: NextRequest) {
     ok: true,
     bytes: html.length,
     version: nextVersion,
+    coverApplied: !!cover,
   });
+}
+
+async function buildCover(imageUrl: string) {
+  const analysis = await analyzeCover(imageUrl);
+  const palette = paletteFromAnalysis(analysis);
+  return { imageUrl, analysis, palette };
 }
