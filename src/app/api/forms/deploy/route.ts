@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { deployForm } from '@/lib/deploy/orchestrator';
+import { getUserRole } from '@/lib/whitelist';
+import { logAdminAction } from '@/lib/audit';
 
 export const maxDuration = 300;
 
@@ -31,6 +33,25 @@ export async function POST(req: NextRequest) {
   const form = formRaw as any;
   if (!form.current_html) {
     return NextResponse.json({ error: 'Form chưa có HTML — generate trước' }, { status: 400 });
+  }
+
+  // Audit if admin deploying someone else's form
+  if (form.owner_id !== user.id) {
+    const role = await getUserRole(user.email);
+    if (role === 'admin') {
+      const { data: ownerRow } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', form.owner_id)
+        .maybeSingle();
+      await logAdminAction({
+        adminEmail: user.email!,
+        action: 'deploy_form',
+        formId: form.id,
+        formSlug: form.slug,
+        targetOwnerEmail: (ownerRow as { email?: string } | null)?.email ?? null,
+      });
+    }
   }
 
   const result = await deployForm({

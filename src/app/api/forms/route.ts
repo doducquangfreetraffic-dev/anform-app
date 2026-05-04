@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
+import { getUserRole } from '@/lib/whitelist';
 import { slugify } from '@/lib/utils/slugify';
 import { DEFAULT_BRIEF, type FormBrief } from '@/types/form-brief';
 
@@ -9,19 +10,38 @@ const createSchema = z.object({
   brief: z.unknown().optional(),
 });
 
-// GET /api/forms — list forms for current user
-export async function GET() {
+// GET /api/forms — admin: ?filter=all (default) | ?filter=mine ; member: always own
+export async function GET(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  const { data, error } = await supabase
+  const role = await getUserRole(user.email);
+  const requested = req.nextUrl.searchParams.get('filter');
+  const filter: 'all' | 'mine' =
+    role === 'admin' ? (requested === 'mine' ? 'mine' : 'all') : 'mine';
+
+  let query = supabase
     .from('forms')
-    .select('id, title, slug, status, deployment_status, form_url, submission_count, created_at, updated_at')
+    .select(
+      'id, title, slug, status, deployment_status, form_url, submission_count, owner_id, created_at, updated_at, owner:profiles!owner_id(email, full_name, avatar_url)',
+    )
     .order('updated_at', { ascending: false });
 
+  if (filter === 'mine') {
+    query = query.eq('owner_id', user.id);
+  }
+  // else 'all' — RLS allows admins to see all rows.
+
+  const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ forms: data ?? [] });
+
+  return NextResponse.json({
+    forms: data ?? [],
+    role,
+    filter,
+    total: data?.length ?? 0,
+  });
 }
 
 // POST /api/forms — create new form (draft)
