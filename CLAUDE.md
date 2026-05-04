@@ -21,6 +21,19 @@
 - Supabase project: `knzctiuwakvzuoznidod`
 - Vercel deploy project: `prj_IpUNkaEFRPda43ycMCqqujABuKou` (anform-deploys)
 
+## SUBMISSION PIPELINE (since 2026-05-04)
+- Forms POST `Content-Type: text/plain` to `https://anform.anvui.edu.vn/api/forms/submit/<slug>`.
+- Endpoint appends to the form's master-sheet tab via Sheets API and inserts into `submissions`.
+- Apps Script web apps were the original middleman but were dropped: scripts created
+  via the API with `executeAs: USER_DEPLOYING` need an interactive scope grant
+  (SpreadsheetApp + UrlFetchApp) before they can run for anonymous users —
+  that grant cannot be performed from a refresh-token API call. Symptom is
+  `<title>Truy cập bị từ chối</title>` HTML on POST. Don't reintroduce the
+  Apps Script path without solving that auth bootstrap.
+- Form HTML still uses placeholder `__APPS_SCRIPT_URL__` for backwards-compat;
+  the orchestrator replaces it (and the new `__SUBMIT_URL__`) with the ANFORM
+  endpoint.
+
 ## CONVENTIONS
 - TypeScript strict, avoid `any`
 - Vietnamese UI text (except "ANFORM" brand)
